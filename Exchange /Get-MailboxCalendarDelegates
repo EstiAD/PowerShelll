@@ -1,0 +1,73 @@
+﻿function Get-MailboxCalendarDelegates {
+    <#
+    .SYNOPSIS
+    Retrieves a list of user delegated calendar permissions.
+    .DESCRIPTION
+    Retrieves a list of user delegated calendar permissions.
+    .PARAMETER MailboxNames
+    Array of mailbox names in string format.
+    .PARAMETER MailboxObject
+    One or more mailbox objects.
+    .LINK
+    http://www.the-little-things.net
+    .LINK
+    https://github.com/zloeber/Powershell/
+    .NOTES
+    Last edit   :   10/10/2014
+    Version     :   1.0.0 10/10/2014
+    Author      :   Zachary Loeber
+
+    .EXAMPLE
+    Get-MailboxCalendarDelegates -MailboxName "Test User1" -Verbose
+
+    Description
+    -----------
+    TBD
+    #>
+    [CmdLetBinding(DefaultParameterSetName='AsStringArray')]
+    param(
+        [Parameter(ParameterSetName='AsStringArray', Mandatory=$True, ValueFromPipeline=$True, Position=0, HelpMessage="Enter an Exchange mailbox name")]
+        [string[]]$MailboxNames,
+        [Parameter(ParameterSetName='AsMailbox', Mandatory=$True, ValueFromPipeline=$True, Position=0, HelpMessage="Enter an Exchange mailbox name")]
+        $MailboxObject
+    )
+    begin {
+        $FunctionName = $MyInvocation.MyCommand.Name
+        Write-Verbose "$($FunctionName): Begin"
+        $Mailboxes = @()
+    }
+    process {
+        switch ($PSCmdlet.ParameterSetName) {
+            'AsStringArray' {
+                try {
+                    $Mailboxes = @($MailboxNames | Foreach {Get-Mailbox $_ -erroraction Stop})
+                }
+                catch {
+                    Write-Warning = "$($FunctionName): $_.Exception.Message"
+                }
+            }
+            'AsMailbox' {
+               $Mailboxes = @($MailboxObject)
+            }
+        }
+
+        foreach ($Mailbox in $Mailboxes) {
+            Write-Verbose "$($FunctionName): Processing Mailbox $($Mailbox.Name)"
+            $PossibleDelegates = @(Get-CalendarProcessing $Mailbox | Where {($_.resourcedelegates)}) 
+            $PossibleDelegates | Foreach {
+                $delegates = @()
+                Foreach ($delegate in $_.resourcedelegates)
+                {
+                    $delegates += $delegate.Name
+                }
+                New-Object psobject -Property @{
+                    'Mailbox' = $Mailbox.Name
+                    'Delegates' = $delegates
+                }
+            }
+        }
+    }
+    end {
+        Write-Verbose "$($FunctionName): End"
+    }
+}
